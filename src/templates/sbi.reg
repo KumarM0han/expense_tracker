@@ -1,0 +1,8 @@
+// Comments start with double-slash
+// syntax :
+// <prop in small case> : <regex>
+// regex can use named group. Reference https://docs.rs/regex/latest/regex/#example-named-capture-groups
+transaction : r"^(?<txndate>\d{1,2}\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{4})\s+(?<valdate>\d{1,2}\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{4})\s+(?<info>.*)\s+(?<txnamt>\d{0,2},?\d{0,2},?\d{0,3}\.\d{2})\s+(?<finalbal>\d{0,2},?\d{0,2},?\d{0,3}\.\d{2})"
+start_date : r"Start Date\s+:\s+(?<startdate>\d{1,2}\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{4})"
+end_date : r"End Date\s+:\s+(?<enddate>\d{1,2}\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{4})"
+account_number : r"Account Number\s+:\s+_(?<accnumber>\d+)"
