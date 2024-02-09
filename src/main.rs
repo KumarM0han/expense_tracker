@@ -1,13 +1,112 @@
+use clap::builder::TypedValueParser;
+use clap::Parser;
+use clio::ClioPath;
 use regex::Regex;
-use std::{fs::OpenOptions, io::BufRead, io::BufReader};
-
 use std::collections::HashMap;
+use std::path::Path;
+use std::{fs::File, fs::OpenOptions, io::BufRead, io::BufReader};
 
-fn reg_template_config_parser() -> HashMap<String, (String, Regex)> {
-    let template_file = OpenOptions::new()
+#[derive(Parser)]
+struct Args {
+    #[arg(short, long)]
+    statement: ClioPath,
+
+    #[clap(short, long, value_parser = clap::value_parser!(ClioPath).exists().is_file())]
+    parser: ClioPath,
+}
+
+#[derive(Debug)]
+enum TransactionType {
+    Credit,
+    Debit,
+}
+
+#[derive(Debug)]
+struct Transaction {
+    on: String,
+    description: String,
+    amount: f64,
+    tr_type: TransactionType,
+}
+
+#[derive(Debug)]
+struct AccountSBI {
+    account_number: String,
+    balance: f64,
+    transactions: Vec<Transaction>,
+}
+
+fn main() {
+    let args = Args::parse();
+    let raw_file = OpenOptions::new()
         .read(true)
-        .open("src/templates/sbi.reg")
+        .open(args.statement.path())
         .unwrap();
+    let buff_file = BufReader::new(raw_file);
+
+    let prop_to_regex = reg_template_config_parser(args.parser.path());
+    let mut sbi_account = AccountSBI::new();
+    sbi_account.add_deatils_from_file(buff_file, &prop_to_regex);
+    println!("{:?}", sbi_account);
+}
+
+impl AccountSBI {
+    fn new() -> Self {
+        Self {
+            account_number: "".to_owned(),
+            balance: 0.0,
+            transactions: Vec::new(),
+        }
+    }
+
+    fn add_deatils_from_file(
+        &mut self,
+        buffered_file: BufReader<File>,
+        prop_to_regex: &HashMap<String, (String, Regex)>,
+    ) {
+        for line in buffered_file.lines() {
+            let line = line.unwrap();
+
+            for (prop, reg) in prop_to_regex.iter() {
+                if let Some(caps) = reg.1.captures(&line) {
+                    println!("{:?}", caps.name("accnumber"));
+                    if prop == "account_number" {
+                        self.account_number = caps["accnumber"].to_string();
+                    } else if prop == "starting_balance" {
+                        self.balance = caps["initbalance"].replace(',', "").parse().unwrap();
+                    } else if prop == "transaction" {
+                        let final_bal_from_transaction =
+                            caps["finalbal"].replace(',', "").parse::<f64>().unwrap();
+                        let txnamt = caps["txnamt"].replace(',', "").parse::<f64>().unwrap();
+                        let valdate = caps["valdate"].to_owned();
+                        let descript = caps["info"].to_owned();
+                        if final_bal_from_transaction < self.balance {
+                            self.transactions.push(Transaction {
+                                amount: txnamt,
+                                description: descript,
+                                on: valdate,
+                                tr_type: TransactionType::Debit,
+                            });
+                        } else {
+                            self.transactions.push(Transaction {
+                                amount: txnamt,
+                                description: descript,
+                                on: valdate,
+                                tr_type: TransactionType::Credit,
+                            });
+                        }
+                        self.balance = final_bal_from_transaction;
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn reg_template_config_parser<P: AsRef<Path>>(
+    template_file: P,
+) -> HashMap<String, (String, Regex)> {
+    let template_file = OpenOptions::new().read(true).open(template_file).unwrap();
     let template_file_buf = BufReader::new(template_file);
 
     let re = Regex::new(r"^(?<prop>\w+)\s+:\s+(?<regex>.*)").unwrap();
@@ -32,93 +131,4 @@ fn reg_template_config_parser() -> HashMap<String, (String, Regex)> {
     }
 
     map
-}
-
-fn main() {
-    let raw_file = OpenOptions::new().read(true).open("sbi.txt").unwrap();
-    let buff_file = BufReader::new(raw_file);
-
-    let prop_to_regex = reg_template_config_parser();
-
-    for line in buff_file.lines() {
-        let line = line.unwrap();
-
-        // Parsers
-
-        for (prop, reg) in prop_to_regex.iter() {
-            if let Some(caps) = reg.1.captures(&line) {
-                for c in caps.iter() {
-                    println!("{:?}", c);
-                }
-            }
-        }
-
-        // if let Some(acc_number) = get_account_number(&line) {
-        //     println!("AccNum: {}", acc_number);
-        // }
-
-        // if let Some(start_date) = get_start_date(&line) {
-        //     println!("Start Date: {}", start_date);
-        // }
-
-        // if let Some(end_date) = get_end_date(&line) {
-        //     println!("Start Date: {}", end_date);
-        // }
-
-        extract_transaction_entry(&line);
-    }
-}
-
-fn extract_transaction_entry(line: &str) {
-    let transaction_search_pattern = r"^(?<txndate>\d{1,2}\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{4})\s+(?<valdate>\d{1,2}\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{4})\s+(?<info>.*)\s+(?<txnamt>\d{0,2},?\d{0,2},?\d{0,3}\.\d{2})\s+(?<finalbal>\d{0,2},?\d{0,2},?\d{0,3}\.\d{2})";
-    let re = Regex::new(transaction_search_pattern).unwrap();
-    if let Some(caps) = re.captures(line) {
-        println!("txndate: {}", &caps["txndate"]);
-        println!("valdate: {}", &caps["valdate"]);
-        println!("info: {}", &caps["info"]);
-        println!("txnamt: {}", &caps["txnamt"]);
-        println!("finalbal: {}\n", &caps["finalbal"]);
-    }
-}
-
-fn get_end_date(line: &str) -> Option<&str> {
-    if !line.starts_with("End Date") {
-        return None;
-    }
-
-    let end_date = line
-        .split(':')
-        .map(|s| s.trim())
-        .last()
-        .expect("Failed to extract end date from iterator");
-
-    Some(end_date)
-}
-
-fn get_start_date(line: &str) -> Option<&str> {
-    if !line.starts_with("Start Date") {
-        return None;
-    }
-
-    let start_date = line
-        .split(':')
-        .map(|s| s.trim())
-        .last()
-        .expect("Failed to extract start date from iterator");
-
-    Some(start_date)
-}
-
-fn get_account_number(line: &str) -> Option<&str> {
-    if !line.starts_with("Account Number") {
-        return None;
-    }
-
-    let acc_number = line
-        .split(':')
-        .map(|s| s.trim())
-        .last()
-        .expect("Failed to extract account number from iterator");
-
-    Some(acc_number)
 }
