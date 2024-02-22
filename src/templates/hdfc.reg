@@ -1,0 +1,7 @@
+// Comments start with double-slash
+// syntax :
+// <prop in small case> : <regex>
+// regex can use named group. Reference https://docs.rs/regex/latest/regex/#example-named-capture-groups
+// adding ?: in () ignores creating capture group. See https://stackoverflow.com/questions/6863518/regex-match-one-of-two-words
+//transaction : \s+(?<txndate>\d{2}/\d{2}/\d{2})\s+,(?<info>.*)\s+,\d{2}/\d{2}/\d{2}\s+,\s+(?<debitamt>\d{0,2},?\d{0,2},?\d{0,3}\.\d{2})\s+,\s+(?<creditamt>\d{0,2},?\d{0,2},?\d{0,3}\.\d{2})\s+,\s+\d{1,}\s+,\s+(?<balance>\d{0,2},?\d{0,2},?\d{0,3}\.\d{2})
+transaction : \s+(?<txndate>\d{2}/\d{2}/\d{2})\s+,(?<info>.*)\s+,\d{2}/\d{2}/\d{2}\s+,\s+(?<debitamt>\d{0,2},?\d{0,2},?\d{0,3}\.\d{2})\s+,\s+(?<creditamt>\d{0,2},?\d{0,2},?\d{0,3}\.\d{2})\s+,\s*\d+\s*,\s+(?<balance>\d{0,2},?\d{0,2},?\d{0,3}\.\d{2})
