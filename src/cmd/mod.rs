@@ -1,4 +1,4 @@
-use clap::Parser;
+use clap::{Parser, Subcommand};
 use clio::ClioPath;
 use regex::Regex;
 use std::collections::HashMap;
@@ -12,13 +12,40 @@ pub struct Cmd {
     prop_to_regex: HashMap<String, (String, Regex)>,
 }
 
+/// Automated Expense Parsing
 #[derive(Parser)]
 struct Args {
+    /// Path to bank statement file
     #[arg(short, long)]
     statement: ClioPath,
 
+    /// Regex template path for parsing
     #[clap(short, long, value_parser = clap::value_parser!(ClioPath).exists().is_file())]
     parser: ClioPath,
+
+    #[command(subcommand)]
+    accounts_supported: Option<AccountSupported>,
+}
+
+/// Supported Accounts
+#[derive(Subcommand)]
+enum AccountSupported {
+    /// Use Delimited Text File.
+    /// Reg template must contain transaction property with following details:
+    /// txndate : transaction date,
+    /// info : description,
+    /// debitamt: debit amount,
+    /// creditamt: credit amount,
+    /// balance: balance,
+    HDFC,
+
+    /// Use Text File.
+    /// Reg template must contain transaction property with following details:
+    /// txndate & valdate : transaction date,
+    /// info : description,
+    /// txnamt: transaction amount,
+    /// finalbal: balance,
+    SBI,
 }
 
 impl Cmd {
